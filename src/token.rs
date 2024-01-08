@@ -49,3 +49,11 @@ impl Display for TokenKind {
         }
     }
 }
+
+pub fn lookup_ident(identifier: &str) -> TokenKind {
+    match identifier {
+        "fn" => TokenKind::Function,
+        "let" => TokenKind::Let,
+        _ => TokenKind::Ident,
+    }
+}
