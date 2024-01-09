@@ -13,43 +13,49 @@ pub enum StatementNode {
 }
 
 impl Node for StatementNode {
-    #[allow(clippy::needless_return)]
     fn token_literal(&self) -> String {
-        return match self {
+        match self {
             Self::Let(let_stmt) => let_stmt.token_literal(),
             Self::Return(ret_stmt) => ret_stmt.token_literal(),
             Self::Expression(exp_stmt) => exp_stmt.token_literal(),
-        };
+        }
     }
 
-    #[allow(clippy::needless_return)]
     fn print_string(&self) -> String {
-        return match self {
+        match self {
             Self::Let(let_stmt) => let_stmt.print_string(),
             Self::Return(ret_stmt) => ret_stmt.print_string(),
             Self::Expression(exp_stmt) => exp_stmt.print_string(),
-        };
+        }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum ExpressionNode {
+    #[default]
+    None,
     IdentifierNode(Identifier),
+    Integer(IntegerLiteral),
+    Prefix(PrefixExpression),
 }
 
 impl Node for ExpressionNode {
-    #[allow(clippy::needless_return)]
     fn token_literal(&self) -> String {
-        return match self {
+        match self {
             Self::IdentifierNode(identifier) => identifier.token_literal(),
-        };
+            Self::Integer(integer) => integer.token_literal(),
+            Self::Prefix(prefix_exp) => prefix_exp.token_literal(),
+            Self::None => String::from(""),
+        }
     }
 
-    #[allow(clippy::needless_return)]
     fn print_string(&self) -> String {
-        return match self {
+        match self {
             Self::IdentifierNode(identifier) => identifier.print_string(),
-        };
+            Self::Integer(integer) => integer.print_string(),
+            Self::Prefix(prefix_exp) => prefix_exp.print_string(),
+            Self::None => String::from(""),
+        }
     }
 }
 
@@ -58,9 +64,8 @@ pub struct Program {
 }
 
 impl Node for Program {
-    #[allow(clippy::needless_return)]
     fn token_literal(&self) -> String {
-        return if !self.statements.is_empty() {
+        if !self.statements.is_empty() {
             match &self.statements[0] {
                 StatementNode::Let(let_stmt) => let_stmt.token_literal(),
                 StatementNode::Return(ret_stmt) => ret_stmt.token_literal(),
@@ -68,7 +73,7 @@ impl Node for Program {
             }
         } else {
             String::from("")
-        };
+        }
     }
 
     fn print_string(&self) -> String {
@@ -162,6 +167,44 @@ impl Node for ExpressionStatement {
             return expression.print_string();
         }
         String::from("")
+    }
+}
+
+#[derive(Debug)]
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+
+impl Node for IntegerLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        self.token_literal()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct PrefixExpression {
+    pub token: Token,
+    pub operator: String,
+    pub right: Box<ExpressionNode>,
+}
+
+impl Node for PrefixExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        let mut out = String::from("");
+        out.push('(');
+        out.push_str(self.operator.as_str());
+        out.push_str(self.right.print_string().as_str());
+        out.push(')');
+        out
     }
 }
 
