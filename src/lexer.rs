@@ -485,8 +485,6 @@ mod test {
                 kind: TokenKind::Rbrace,
                 literal: "}".to_string(),
             },
-            // 10 == 10;
-            // 10 != 9;
             Token {
                 kind: TokenKind::Int,
                 literal: "10".to_string(),
