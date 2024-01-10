@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::io;
 
 use crate::repl::start;
