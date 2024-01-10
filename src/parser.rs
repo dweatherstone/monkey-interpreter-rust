@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        ExpressionNode, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral,
-        LetStatement, PrefixExpression, Program, ReturnStatement, StatementNode,
+        BlockStatement, Boolean, ExpressionNode, ExpressionStatement, Identifier, IfExpression,
+        InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement,
+        StatementNode,
     },
     lexer::Lexer,
     token::{Token, TokenKind},
@@ -61,6 +62,10 @@ impl Parser {
         parser.register_prefix(TokenKind::Int, Self::parse_integer_literal);
         parser.register_prefix(TokenKind::Bang, Self::parse_prefix_expression);
         parser.register_prefix(TokenKind::Minus, Self::parse_prefix_expression);
+        parser.register_prefix(TokenKind::True, Self::parse_boolean);
+        parser.register_prefix(TokenKind::False, Self::parse_boolean);
+        parser.register_prefix(TokenKind::Lparen, Self::parse_grouped_expression);
+        parser.register_prefix(TokenKind::If, Self::parse_if_expression);
 
         parser.register_infix(TokenKind::Plus, Self::parse_infix_expression);
         parser.register_infix(TokenKind::Minus, Self::parse_infix_expression);
@@ -115,6 +120,75 @@ impl Parser {
             None => return None,
         }
         Some(ExpressionNode::Prefix(expression))
+    }
+
+    fn parse_boolean(&mut self) -> Option<ExpressionNode> {
+        Some(ExpressionNode::BooleanNode(Boolean {
+            token: self.cur_token.clone(),
+            value: self.cur_token_is(TokenKind::True),
+        }))
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<ExpressionNode> {
+        self.next_token();
+        let exp = self.parse_expression(PrecedenceLevel::Lowest);
+        if !self.expect_peek(TokenKind::Rparen) {
+            return None;
+        }
+        exp
+    }
+
+    fn parse_if_expression(&mut self) -> Option<ExpressionNode> {
+        let mut expression = IfExpression {
+            token: self.cur_token.clone(),
+            alternative: None,
+            condition: Default::default(),
+            consequence: Default::default(),
+        };
+        if !self.expect_peek(TokenKind::Lparen) {
+            return None;
+        }
+        self.next_token();
+        expression.condition = Box::new(
+            self.parse_expression(PrecedenceLevel::Lowest)
+                .expect("error parsing condition"),
+        );
+
+        if !self.expect_peek(TokenKind::Rparen) {
+            return None;
+        }
+        if !self.expect_peek(TokenKind::Lbrace) {
+            return None;
+        }
+
+        expression.consequence = self.parse_block_statement();
+
+        if self.peek_token_is(TokenKind::Else) {
+            self.next_token();
+            if !self.expect_peek(TokenKind::Lbrace) {
+                return None;
+            }
+            expression.alternative = Some(self.parse_block_statement());
+        }
+
+        Some(ExpressionNode::IfExpressionNode(expression))
+    }
+
+    fn parse_block_statement(&mut self) -> BlockStatement {
+        let mut block = BlockStatement {
+            token: self.cur_token.clone(),
+            statements: Vec::new(),
+        };
+        self.next_token();
+        while !self.cur_token_is(TokenKind::Rbrace) && !self.cur_token_is(TokenKind::Eof) {
+            let stmt = self.parse_statement();
+
+            if let Some(stmt) = stmt {
+                block.statements.push(stmt);
+            }
+            self.next_token();
+        }
+        block
     }
 
     fn parse_infix_expression(&mut self, left: ExpressionNode) -> Option<ExpressionNode> {
@@ -292,6 +366,7 @@ mod test {
     use crate::{
         ast::{ExpressionNode, Identifier, Node, StatementNode},
         lexer::Lexer,
+        token::TokenKind,
     };
 
     use super::Parser;
@@ -490,7 +565,12 @@ mod test {
 
     #[test]
     fn test_parsing_prefix_expressions() {
-        let prefix_tests = vec![("!5", "!", 5), ("-15", "-", 15)];
+        let prefix_tests: Vec<(&str, &str, Box<dyn any::Any>)> = vec![
+            ("!5", "!", Box::new(5)),
+            ("-15", "-", Box::new(15)),
+            ("!true", "!", Box::new(true)),
+            ("!false", "!", Box::new(false)),
+        ];
         for test in prefix_tests {
             let lexer = Lexer::new(test.0);
             let mut parser = Parser::new(lexer);
@@ -515,7 +595,7 @@ mod test {
                                 "prefix_exp.operator not {}. Got = {}",
                                 test.1, prefix_exp.operator
                             );
-                            test_integer_literal(&prefix_exp.right, test.2);
+                            test_literal_expression(&prefix_exp.right, test.2);
                         }
                         other => panic!("expression not PrefixExpression. Got = {:?}", other),
                     }
@@ -530,15 +610,18 @@ mod test {
 
     #[test]
     fn test_parsing_infix_expressions() {
-        let infix_tests: Vec<(&str, i64, &str, i64)> = vec![
-            ("5 + 3", 5, "+", 3),
-            ("5 - 3", 5, "-", 3),
-            ("5 * 3", 5, "*", 3),
-            ("6 / 3", 6, "/", 3),
-            ("5 > 3", 5, ">", 3),
-            ("5 < 3", 5, "<", 3),
-            ("5 == 3", 5, "==", 3),
-            ("5 != 3", 5, "!=", 3),
+        let infix_tests: Vec<(&str, Box<dyn any::Any>, &str, Box<dyn any::Any>)> = vec![
+            ("5 + 3", Box::new(5), "+", Box::new(3)),
+            ("5 - 3", Box::new(5), "-", Box::new(3)),
+            ("5 * 3", Box::new(5), "*", Box::new(3)),
+            ("6 / 3", Box::new(6), "/", Box::new(3)),
+            ("5 > 3", Box::new(5), ">", Box::new(3)),
+            ("5 < 3", Box::new(5), "<", Box::new(3)),
+            ("5 == 3", Box::new(5), "==", Box::new(3)),
+            ("5 != 3", Box::new(5), "!=", Box::new(3)),
+            ("true == true", Box::new(true), "==", Box::new(true)),
+            ("true != false", Box::new(true), "!=", Box::new(false)),
+            ("false == false", Box::new(false), "==", Box::new(false)),
         ];
         for test in infix_tests {
             let lexer = Lexer::new(test.0);
@@ -557,12 +640,7 @@ mod test {
                     assert!(exp_stmt.expression.is_some());
                     let exp = exp_stmt.expression.as_ref().unwrap();
 
-                    test_infix_expression(
-                        exp,
-                        Box::new(test.1),
-                        test.2.to_string(),
-                        Box::new(test.3),
-                    );
+                    test_infix_expression(exp, test.1, test.2.to_string(), test.3);
                 }
                 other => panic!(
                     "program.statement[0] is not ExpressionStatement. Got = {:?}",
@@ -591,6 +669,15 @@ mod test {
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
         for test in tests {
             let lexer = Lexer::new(test.0);
@@ -600,6 +687,190 @@ mod test {
 
             let actual = program.print_string();
             assert_eq!(actual, test.1, "expected = {}, got = {}", test.1, actual);
+        }
+    }
+
+    #[test]
+    fn test_boolean_expressions() {
+        let input = r#"
+        true;
+        false;
+        "#;
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        check_parser_errors(parser);
+
+        assert_eq!(
+            program.statements.len(),
+            2,
+            "program.statements does not contain 2 statements. Got = {}",
+            program.statements.len()
+        );
+
+        let expected_values = vec![(TokenKind::True, "true"), (TokenKind::False, "false")];
+        for (idx, test) in expected_values.into_iter().enumerate() {
+            match &program.statements[idx] {
+                StatementNode::Expression(exp_stmt) => {
+                    assert!(exp_stmt.expression.is_some());
+                    let exp = exp_stmt.expression.as_ref().unwrap();
+
+                    match exp {
+                        ExpressionNode::BooleanNode(bool_exp) => {
+                            assert_eq!(
+                                bool_exp.token.kind, test.0,
+                                "token kind is not expected. Got = {}",
+                                bool_exp.token.kind
+                            );
+                            assert_eq!(
+                                bool_exp.token_literal(),
+                                test.1,
+                                "token_literal() does not match. Got = {}",
+                                bool_exp.token_literal()
+                            );
+                        }
+                        other => panic!("expression is not Boolean. Got = {:?}", other),
+                    }
+                }
+                other => panic!(
+                    "program.statements[{}] is not ExpressionStatement. Got = {:?}",
+                    idx, other
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        check_parser_errors(parser);
+
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.statements does not contain 1 statements. Got = {}",
+            program.statements.len()
+        );
+
+        match &program.statements[0] {
+            StatementNode::Expression(exp_stmt) => match exp_stmt.expression.as_ref().unwrap() {
+                ExpressionNode::IfExpressionNode(if_exp) => {
+                    test_infix_expression(
+                        &if_exp.condition,
+                        Box::new("x"),
+                        String::from("<"),
+                        Box::new("y"),
+                    );
+                    assert_eq!(
+                        if_exp.consequence.statements.len(),
+                        1,
+                        "consequence is not 1 statement. Got = {}",
+                        if_exp.consequence.statements.len()
+                    );
+                    match &if_exp.consequence.statements[0] {
+                        StatementNode::Expression(consequence) => {
+                            test_identifier(
+                                consequence
+                                    .expression
+                                    .as_ref()
+                                    .expect("error parsing consequence"),
+                                String::from("x"),
+                            );
+                        }
+                        other => panic!(
+                            "consequence.statements[0] is not ExpressionStatement. Got = {:?}",
+                            other
+                        ),
+                    }
+
+                    assert!(if_exp.alternative.is_none());
+                }
+                other => panic!("expression is not IfExpression. Got = {:?}", other),
+            },
+            other => panic!(
+                "program.statements[0] is not ExpressionStatement. Got = {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = "if (x < y) { x } else { y }";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        check_parser_errors(parser);
+
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.statements does not contain 1 statements. Got = {}",
+            program.statements.len()
+        );
+
+        match &program.statements[0] {
+            StatementNode::Expression(exp_stmt) => match exp_stmt.expression.as_ref().unwrap() {
+                ExpressionNode::IfExpressionNode(if_exp) => {
+                    test_infix_expression(
+                        &if_exp.condition,
+                        Box::new("x"),
+                        String::from("<"),
+                        Box::new("y"),
+                    );
+                    assert_eq!(
+                        if_exp.consequence.statements.len(),
+                        1,
+                        "consequence is not 1 statement. Got = {}",
+                        if_exp.consequence.statements.len()
+                    );
+                    assert_eq!(
+                        if_exp.alternative.as_ref().unwrap().statements.len(),
+                        1,
+                        "alternative is not 1 statement. Got = {}",
+                        if_exp.alternative.as_ref().unwrap().statements.len()
+                    );
+                    match &if_exp.consequence.statements[0] {
+                        StatementNode::Expression(consequence) => {
+                            test_identifier(
+                                consequence
+                                    .expression
+                                    .as_ref()
+                                    .expect("error parsing consequence"),
+                                String::from("x"),
+                            );
+                        }
+                        other => panic!(
+                            "consequence.statements[0] is not ExpressionStatement. Got = {:?}",
+                            other
+                        ),
+                    }
+
+                    match &if_exp.alternative.as_ref().unwrap().statements[0] {
+                        StatementNode::Expression(alternative) => {
+                            test_identifier(
+                                alternative
+                                    .expression
+                                    .as_ref()
+                                    .expect("error parsing alternative"),
+                                String::from("y"),
+                            );
+                        }
+                        other => panic!(
+                            "alternative.statements[0] is not ExpressionStatement. Got = {:?}",
+                            other
+                        ),
+                    }
+                }
+                other => panic!("expression is not IfExpression. Got = {:?}", other),
+            },
+            other => panic!(
+                "program.statements[0] is not ExpressionStatement. Got = {:?}",
+                other
+            ),
         }
     }
 
@@ -686,8 +957,31 @@ mod test {
             Some(exp_string) => test_identifier(expression, exp_string.to_string()),
             None => match expected.downcast_ref::<i64>() {
                 Some(exp_int) => test_integer_literal(expression, exp_int.to_owned()),
-                None => panic!("should not happen"),
+                None => match expected.downcast_ref::<bool>() {
+                    Some(bool) => test_boolean_literal(expression, bool.to_owned()),
+                    None => (),
+                },
             },
+        }
+    }
+
+    fn test_boolean_literal(expression: &ExpressionNode, value: bool) {
+        match expression {
+            ExpressionNode::BooleanNode(bool_exp) => {
+                assert_eq!(
+                    bool_exp.value, value,
+                    "bool_exp.value not {}, got {}",
+                    value, bool_exp.value
+                );
+                assert_eq!(
+                    bool_exp.token_literal(),
+                    format!("{}", value),
+                    "bool_exp_token_literal() not {}, got {}",
+                    value,
+                    bool_exp.token_literal()
+                );
+            }
+            other => panic!("expression is not BooleanNode. Got {:?}", other),
         }
     }
 
