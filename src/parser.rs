@@ -100,15 +100,14 @@ impl Parser {
         match self.cur_token.literal.parse::<i64>() {
             Ok(value) => {
                 literal.value = value;
-                return Some(ExpressionNode::Integer(literal));
+                Some(ExpressionNode::Integer(literal))
             }
             Err(_) => {
                 let msg = format!("could not parse {} as integer", self.cur_token.literal);
                 self.errors.push(msg);
-                return None;
+                None
             }
-        };
-        None
+        }
     }
 
     fn parse_prefix_expression(&mut self) -> Option<ExpressionNode> {
@@ -459,12 +458,14 @@ mod test {
     use std::any;
 
     use crate::{
-        ast::{ExpressionNode, ExpressionStatement, Identifier, Node, StatementNode},
+        ast::{ExpressionNode, Identifier, Node, StatementNode},
         lexer::Lexer,
         token::TokenKind,
     };
 
     use super::Parser;
+
+    type InfixTest<'a> = Vec<(&'a str, Box<dyn any::Any>, &'a str, Box<dyn any::Any>)>;
 
     #[test]
     fn test_let_statements() {
@@ -718,7 +719,7 @@ mod test {
 
     #[test]
     fn test_parsing_infix_expressions() {
-        let infix_tests: Vec<(&str, Box<dyn any::Any>, &str, Box<dyn any::Any>)> = vec![
+        let infix_tests: InfixTest = vec![
             ("5 + 3", Box::new(5), "+", Box::new(3)),
             ("5 - 3", Box::new(5), "-", Box::new(3)),
             ("5 * 3", Box::new(5), "*", Box::new(3)),
@@ -1015,34 +1016,32 @@ mod test {
                         "function literal parameters wrong lenght. Expected 2, got = {}",
                         fn_lit.parameters.len()
                     );
-                    match &fn_lit.parameters[0] {
-                        Identifier { token, value } => {
-                            assert_eq!(
-                                value, "x",
-                                "parameter[0] wrong. Expected 'x', got = {}",
-                                value
-                            );
-                            assert_eq!(
-                                token.literal, "x",
-                                "parameter[0] wrong. Expected 'x', got = {}",
-                                token.literal
-                            );
-                        }
+                    let Identifier { token, value } = &fn_lit.parameters[0];
+                    {
+                        assert_eq!(
+                            value, "x",
+                            "parameter[0] wrong. Expected 'x', got = {}",
+                            value
+                        );
+                        assert_eq!(
+                            token.literal, "x",
+                            "parameter[0] wrong. Expected 'x', got = {}",
+                            token.literal
+                        );
                     }
 
-                    match &fn_lit.parameters[1] {
-                        Identifier { token, value } => {
-                            assert_eq!(
-                                value, "y",
-                                "parameter[1] wrong. Expected 'y', got = {}",
-                                value
-                            );
-                            assert_eq!(
-                                token.literal, "y",
-                                "parameter[1] wrong. Expected 'y', got = {}",
-                                token.literal
-                            );
-                        }
+                    let Identifier { token, value } = &fn_lit.parameters[1];
+                    {
+                        assert_eq!(
+                            value, "y",
+                            "parameter[1] wrong. Expected 'y', got = {}",
+                            value
+                        );
+                        assert_eq!(
+                            token.literal, "y",
+                            "parameter[1] wrong. Expected 'y', got = {}",
+                            token.literal
+                        );
                     }
 
                     assert_eq!(
@@ -1256,10 +1255,11 @@ mod test {
             Some(exp_string) => test_identifier(expression, exp_string.to_string()),
             None => match expected.downcast_ref::<i64>() {
                 Some(exp_int) => test_integer_literal(expression, exp_int.to_owned()),
-                None => match expected.downcast_ref::<bool>() {
-                    Some(bool) => test_boolean_literal(expression, bool.to_owned()),
-                    None => (),
-                },
+                None => {
+                    if let Some(bool) = expected.downcast_ref::<bool>() {
+                        test_boolean_literal(expression, bool.to_owned());
+                    }
+                }
             },
         }
     }
