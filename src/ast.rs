@@ -37,6 +37,7 @@ pub enum ExpressionNode {
     IdentifierNode(Identifier),
     Integer(IntegerLiteral),
     Prefix(PrefixExpression),
+    Infix(InfixExpression),
 }
 
 impl Node for ExpressionNode {
@@ -46,6 +47,7 @@ impl Node for ExpressionNode {
             Self::Integer(integer) => integer.token_literal(),
             Self::Prefix(prefix_exp) => prefix_exp.token_literal(),
             Self::None => String::from(""),
+            Self::Infix(infix_exp) => infix_exp.token_literal(),
         }
     }
 
@@ -55,6 +57,7 @@ impl Node for ExpressionNode {
             Self::Integer(integer) => integer.print_string(),
             Self::Prefix(prefix_exp) => prefix_exp.print_string(),
             Self::None => String::from(""),
+            Self::Infix(infix_exp) => infix_exp.print_string(),
         }
     }
 }
@@ -202,6 +205,30 @@ impl Node for PrefixExpression {
         let mut out = String::from("");
         out.push('(');
         out.push_str(self.operator.as_str());
+        out.push_str(self.right.print_string().as_str());
+        out.push(')');
+        out
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct InfixExpression {
+    pub token: Token,
+    pub operator: String,
+    pub left: Box<ExpressionNode>,
+    pub right: Box<ExpressionNode>,
+}
+
+impl Node for InfixExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        let mut out = String::from("");
+        out.push('(');
+        out.push_str(self.left.print_string().as_str());
+        out.push_str(format!(" {} ", self.operator).as_str());
         out.push_str(self.right.print_string().as_str());
         out.push(')');
         out
