@@ -1,5 +1,5 @@
 use crate::{
-    ast::{ExpressionNode, Program, StatementNode},
+    ast::{BlockStatement, ExpressionNode, IfExpression, Program, StatementNode},
     object::Object,
 };
 
@@ -18,6 +18,10 @@ impl Evaluator {
         let mut result = Object::Null;
         for stmt in program.statements {
             result = self.eval_statement(stmt);
+
+            if let Object::ReturnValue(ret) = result {
+                return *ret;
+            }
         }
 
         result
@@ -26,6 +30,10 @@ impl Evaluator {
     fn eval_statement(&self, stmt: StatementNode) -> Object {
         match stmt {
             StatementNode::Expression(exp_stmt) => self.eval_expression(exp_stmt.expression),
+            StatementNode::Return(ret_stmt) => {
+                let value = self.eval_expression(ret_stmt.ret_value);
+                Object::ReturnValue(Box::new(value))
+            }
             _ => NULL,
         }
     }
@@ -46,6 +54,7 @@ impl Evaluator {
                     let right = self.eval_expression(Some(*infix_exp.right));
                     Self::eval_infix_expression(infix_exp.operator, &left, &right)
                 }
+                ExpressionNode::IfExpressionNode(if_exp) => self.eval_if_expression(if_exp),
                 _ => NULL,
             };
         }
@@ -74,6 +83,39 @@ impl Evaluator {
             },
             _ => NULL,
         }
+    }
+
+    fn eval_if_expression(&self, exp: IfExpression) -> Object {
+        let condition = self.eval_expression(Some(*exp.condition));
+        if Self::is_truthy(condition) {
+            self.eval_block_statement(exp.consequence)
+        } else if let Some(alt) = exp.alternative {
+            self.eval_block_statement(alt)
+        } else {
+            NULL
+        }
+    }
+
+    fn is_truthy(obj: Object) -> bool {
+        match obj {
+            Object::Null => false,
+            Object::Boolean(true) => true,
+            Object::Boolean(false) => false,
+            _ => true,
+        }
+    }
+
+    fn eval_block_statement(&self, block: BlockStatement) -> Object {
+        let mut result = NULL;
+
+        for stmt in block.statements {
+            result = self.eval_statement(stmt);
+
+            if result.object_type() == "RETURN_VALUE" {
+                return result;
+            }
+        }
+        result
     }
 
     fn eval_bang_operator_expression(right: Object) -> Object {
@@ -195,6 +237,50 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_if_else_expression() {
+        let tests = vec![
+            ("if (true) { 10 }", 10),
+            ("if (false) { 10 }", -999),
+            ("if (1) { 10 }", 10),
+            ("if (1 < 2) { 10 }", 10),
+            ("if (1 > 2) { 10 }", -999),
+            ("if (1 > 2) { 10 } else { 20 }", 20),
+            ("if (1 < 2) { 10 } else { 20 }", 10),
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            if test.1 == -999 {
+                test_null_object(evaluated);
+            } else {
+                test_integer_object(evaluated, test.1)
+            }
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let tests = vec![
+            ("return 10;", 10),
+            ("return 10; 9;", 10),
+            ("return 2 * 5; 9;", 10),
+            ("9; return 2 * 5; 9;", 10),
+            (
+                "if (10 > 1) {
+                if (10 > 1) {
+                    return 10;
+                }
+                return 1;
+            }",
+                10,
+            ),
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            test_integer_object(evaluated, test.1);
+        }
+    }
+
     fn test_eval(input: &str) -> Object {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
@@ -223,5 +309,13 @@ mod test {
             ),
             other => panic!("object is not bool. Got = {:?}", other),
         }
+    }
+
+    fn test_null_object(obj: Object) {
+        // match obj {
+        //     Object::Null => assert!(true),
+        //     _ => assert!(false),
+        // }
+        assert!(obj.object_type() == *"NULL");
     }
 }
