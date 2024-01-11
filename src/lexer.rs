@@ -15,6 +15,7 @@ impl Lexer {
             read_position: 0,
             ch: Default::default(),
         };
+
         lexer.read_char();
 
         lexer
@@ -83,12 +84,13 @@ impl Lexer {
                     Token { kind, literal }
                 } else {
                     Lexer::new_token(TokenKind::Illegal, self.ch)
-                }
+                };
             }
         };
 
         self.read_char();
-        token
+
+        return token;
     }
 
     fn skip_whitespace(&mut self) {
@@ -98,29 +100,11 @@ impl Lexer {
     }
 
     fn peek_char(&self) -> char {
-        if self.read_position >= self.input.len() {
+        return if self.read_position >= self.input.len() {
             '\0'
         } else {
             self.input[self.read_position]
-        }
-    }
-
-    fn read_identifier(&mut self) -> String {
-        let mut identifier = String::new();
-        while Lexer::is_letter(self.ch) {
-            identifier.push(self.ch);
-            self.read_char();
-        }
-        identifier
-    }
-
-    fn read_number(&mut self) -> String {
-        let mut number = String::new();
-        while Lexer::is_digit(self.ch) {
-            number.push(self.ch);
-            self.read_char();
-        }
-        number
+        };
     }
 
     fn new_token(kind: TokenKind, ch: char) -> Token {
@@ -134,8 +118,29 @@ impl Lexer {
         ch.is_alphabetic() || ch == '_'
     }
 
+    fn read_identifier(&mut self) -> String {
+        let mut identifier = String::new();
+
+        while Lexer::is_letter(self.ch) {
+            identifier.push(self.ch);
+            self.read_char();
+        }
+
+        identifier
+    }
+
     fn is_digit(ch: char) -> bool {
         ch.is_numeric()
+    }
+
+    fn read_number(&mut self) -> String {
+        let mut num = String::from("");
+
+        while Lexer::is_digit(self.ch) {
+            num.push(self.ch);
+            self.read_char();
+        }
+        num
     }
 }
 
@@ -146,84 +151,29 @@ mod test {
     use super::Lexer;
 
     #[test]
-    fn test_next_token_basic() {
-        let input = "=+(){},;";
-
-        let expected: Vec<Token> = vec![
-            Token {
-                kind: TokenKind::Assign,
-                literal: "=".to_string(),
-            },
-            Token {
-                kind: TokenKind::Plus,
-                literal: "+".to_string(),
-            },
-            Token {
-                kind: TokenKind::Lparen,
-                literal: "(".to_string(),
-            },
-            Token {
-                kind: TokenKind::Rparen,
-                literal: ")".to_string(),
-            },
-            Token {
-                kind: TokenKind::Lbrace,
-                literal: "{".to_string(),
-            },
-            Token {
-                kind: TokenKind::Rbrace,
-                literal: "}".to_string(),
-            },
-            Token {
-                kind: TokenKind::Comma,
-                literal: ",".to_string(),
-            },
-            Token {
-                kind: TokenKind::Semicolon,
-                literal: ";".to_string(),
-            },
-            Token {
-                kind: TokenKind::Eof,
-                literal: "".to_string(),
-            },
-        ];
-
-        let mut lexer = Lexer::new(input);
-
-        for (idx, exp_token) in expected.into_iter().enumerate() {
-            let recv_token = lexer.next_token();
-            assert_eq!(
-                exp_token.kind, recv_token.kind,
-                "tests[{idx}] - token kind wrong. expected={}, got={}",
-                exp_token.kind, recv_token.kind
-            );
-            assert_eq!(
-                exp_token.literal, recv_token.literal,
-                "tests[{idx}] - token literal wrong. expected={}, got={}",
-                exp_token.literal, recv_token.literal
-            );
-        }
-    }
-
-    #[test]
     fn test_next_token() {
         let input = r#"
         let five = 5;
         let ten = 10;
+
         let add = fn(x, y) {
             x + y;
         };
+
         let result = add(five, ten);
         !-/*5;
         5 < 10 > 5;
+
         if (5 < 10) {
             return true;
         } else {
             return false;
         }
+
         10 == 10;
         10 != 9;
         "#;
+
         let expected: Vec<Token> = vec![
             Token {
                 kind: TokenKind::Let,
@@ -529,12 +479,12 @@ mod test {
             let recv_token = lexer.next_token();
             assert_eq!(
                 exp_token.kind, recv_token.kind,
-                "tests[{idx}] - token kind wrong. expected={}, got={}",
+                "tests[{idx}] - token type wrong. expected={}, got={}",
                 exp_token.kind, recv_token.kind
             );
             assert_eq!(
                 exp_token.literal, recv_token.literal,
-                "tests[{idx}] - token literal wrong. expected={}, got={}",
+                "tests[{idx}] - literal wrong. expected={}, got={}",
                 exp_token.literal, recv_token.literal
             );
         }
