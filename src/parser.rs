@@ -373,9 +373,7 @@ impl Parser {
             value: Default::default(),
         };
 
-        if !self.expect_peek(TokenKind::Ident) {
-            None
-        } else {
+        if self.expect_peek(TokenKind::Ident) {
             stmt.name = Identifier {
                 token: self.cur_token.clone(),
                 value: self.cur_token.literal.clone(),
@@ -391,6 +389,8 @@ impl Parser {
                 }
                 Some(StatementNode::Let(stmt))
             }
+        } else {
+            None
         }
     }
 

@@ -1,8 +1,9 @@
 use std::io::{Stdin, Stdout, Write};
 
-use crate::{ast::Node, lexer::Lexer, parser::Parser};
+use crate::{ast::Node, evaluator::Evaluator, lexer::Lexer, parser::Parser};
 
 pub fn start(stdin: Stdin, mut stdout: Stdout) {
+    let evaluator = Evaluator::new();
     loop {
         write!(stdout, ">> ").expect("should have written prompt string >>");
         stdout.flush().expect("should have flushed stdout");
@@ -21,10 +22,9 @@ pub fn start(stdin: Stdin, mut stdout: Stdout) {
             continue;
         }
 
-        let parsed_program_string = program.print_string();
+        let evaluated = evaluator.eval_program(program);
 
-        writeln!(stdout, "{parsed_program_string}")
-            .expect("parsed program should be written to stdout");
+        writeln!(stdout, "{evaluated}").expect("evaluated should be written to stdout");
     }
 }
 

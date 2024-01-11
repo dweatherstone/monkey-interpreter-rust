@@ -1,0 +1,108 @@
+use crate::{
+    ast::{ExpressionNode, Program, StatementNode},
+    object::Object,
+};
+
+const TRUE: Object = Object::Boolean(true);
+const FALSE: Object = Object::Boolean(false);
+const NULL: Object = Object::Null;
+
+pub struct Evaluator {}
+
+impl Evaluator {
+    pub fn new() -> Self {
+        Evaluator {}
+    }
+
+    pub fn eval_program(&self, program: Program) -> Object {
+        let mut result = Object::Null;
+        for stmt in program.statements {
+            result = self.eval_statement(stmt);
+        }
+
+        result
+    }
+
+    fn eval_statement(&self, stmt: StatementNode) -> Object {
+        match stmt {
+            StatementNode::Expression(exp_stmt) => self.eval_expression(exp_stmt.expression),
+            _ => NULL,
+        }
+    }
+
+    fn eval_expression(&self, expression: Option<ExpressionNode>) -> Object {
+        if let Some(exp) = expression {
+            return match exp {
+                ExpressionNode::Integer(int_lit) => Object::Integer(int_lit.value),
+                ExpressionNode::BooleanNode(bool_exp) => {
+                    Self::native_bool_to_boolean_object(bool_exp.value)
+                }
+                _ => NULL,
+            };
+        }
+        NULL
+    }
+
+    fn native_bool_to_boolean_object(boolean: bool) -> Object {
+        if boolean {
+            TRUE
+        } else {
+            FALSE
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{lexer::Lexer, object::Object, parser::Parser};
+
+    use super::Evaluator;
+
+    #[test]
+    fn test_eval_integer_expression() {
+        let tests = vec![("5", 5), ("10", 10)];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            test_integer_object(evaluated, test.1);
+        }
+    }
+
+    #[test]
+    fn test_eval_boolean_expression() {
+        let tests = vec![("true", true), ("false", false)];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            test_boolean_object(evaluated, test.1);
+        }
+    }
+
+    fn test_eval(input: &str) -> Object {
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        let evaluator = Evaluator::new();
+        evaluator.eval_program(program.unwrap())
+    }
+
+    fn test_integer_object(obj: Object, expected: i64) {
+        match obj {
+            Object::Integer(int_value) => assert_eq!(
+                int_value, expected,
+                "object has wrong value. Got = {}, want = {}",
+                int_value, expected
+            ),
+            other => panic!("object is not integer. Got = {:?}", other),
+        }
+    }
+
+    fn test_boolean_object(obj: Object, expected: bool) {
+        match obj {
+            Object::Boolean(bool_value) => assert_eq!(
+                bool_value, expected,
+                "object has wrong value. Got = {}, want = {}",
+                bool_value, expected
+            ),
+            other => panic!("object is not bool. Got = {:?}", other),
+        }
+    }
+}
