@@ -465,7 +465,7 @@ mod test {
 
     use super::Parser;
 
-    type InfixTest<'a> = Vec<(&'a str, Box<dyn any::Any>, &'a str, Box<dyn any::Any>)>;
+    type InfixTest<'a> = (&'a str, Box<dyn any::Any>, &'a str, Box<dyn any::Any>);
 
     #[test]
     fn test_let_statements() {
@@ -719,7 +719,7 @@ mod test {
 
     #[test]
     fn test_parsing_infix_expressions() {
-        let infix_tests: InfixTest = vec![
+        let infix_tests: Vec<InfixTest> = vec![
             ("5 + 3", Box::new(5), "+", Box::new(3)),
             ("5 - 3", Box::new(5), "-", Box::new(3)),
             ("5 * 3", Box::new(5), "*", Box::new(3)),
