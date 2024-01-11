@@ -37,10 +37,38 @@ impl Evaluator {
                 ExpressionNode::BooleanNode(bool_exp) => {
                     Self::native_bool_to_boolean_object(bool_exp.value)
                 }
+                ExpressionNode::Prefix(prefix_exp) => {
+                    let right = self.eval_expression(Some(*prefix_exp.right));
+                    Self::eval_prefix_expression(prefix_exp.operator, right)
+                }
                 _ => NULL,
             };
         }
         NULL
+    }
+
+    fn eval_prefix_expression(op: String, right: Object) -> Object {
+        match op.as_str() {
+            "!" => Self::eval_bang_operator_expression(right),
+            "-" => Self::eval_minus_prefix_operator_expression(right),
+            _ => NULL,
+        }
+    }
+
+    fn eval_bang_operator_expression(right: Object) -> Object {
+        match right {
+            Object::Boolean(true) => FALSE,
+            Object::Boolean(false) => TRUE,
+            Object::Null => TRUE,
+            _ => FALSE,
+        }
+    }
+
+    fn eval_minus_prefix_operator_expression(right: Object) -> Object {
+        match right {
+            Object::Integer(int_value) => Object::Integer(-int_value),
+            _ => NULL,
+        }
     }
 
     fn native_bool_to_boolean_object(boolean: bool) -> Object {
@@ -60,7 +88,7 @@ mod test {
 
     #[test]
     fn test_eval_integer_expression() {
-        let tests = vec![("5", 5), ("10", 10)];
+        let tests = vec![("5", 5), ("10", 10), ("-5", -5), ("-10", -10), ("--5", 5)];
         for test in tests {
             let evaluated = test_eval(test.0);
             test_integer_object(evaluated, test.1);
@@ -70,6 +98,22 @@ mod test {
     #[test]
     fn test_eval_boolean_expression() {
         let tests = vec![("true", true), ("false", false)];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            test_boolean_object(evaluated, test.1);
+        }
+    }
+
+    #[test]
+    fn test_eval_bang_operator() {
+        let tests = vec![
+            ("!true", false),
+            ("!false", true),
+            ("!5", false),
+            ("!!true", true),
+            ("!!false", false),
+            ("!!5", true),
+        ];
         for test in tests {
             let evaluated = test_eval(test.0);
             test_boolean_object(evaluated, test.1);
