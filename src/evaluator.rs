@@ -22,6 +22,10 @@ impl Evaluator {
             if let Object::ReturnValue(ret) = result {
                 return *ret;
             }
+
+            if let Object::Error(_) = result {
+                return result;
+            }
         }
 
         result
@@ -32,6 +36,9 @@ impl Evaluator {
             StatementNode::Expression(exp_stmt) => self.eval_expression(exp_stmt.expression),
             StatementNode::Return(ret_stmt) => {
                 let value = self.eval_expression(ret_stmt.ret_value);
+                if Self::is_error(&value) {
+                    return value;
+                }
                 Object::ReturnValue(Box::new(value))
             }
             _ => NULL,
@@ -47,11 +54,20 @@ impl Evaluator {
                 }
                 ExpressionNode::Prefix(prefix_exp) => {
                     let right = self.eval_expression(Some(*prefix_exp.right));
+                    if Self::is_error(&right) {
+                        return right;
+                    }
                     Self::eval_prefix_expression(prefix_exp.operator, right)
                 }
                 ExpressionNode::Infix(infix_exp) => {
                     let left = self.eval_expression(Some(*infix_exp.left));
+                    if Self::is_error(&left) {
+                        return left;
+                    }
                     let right = self.eval_expression(Some(*infix_exp.right));
+                    if Self::is_error(&right) {
+                        return right;
+                    }
                     Self::eval_infix_expression(infix_exp.operator, &left, &right)
                 }
                 ExpressionNode::IfExpressionNode(if_exp) => self.eval_if_expression(if_exp),
@@ -65,23 +81,41 @@ impl Evaluator {
         match op.as_str() {
             "!" => Self::eval_bang_operator_expression(right),
             "-" => Self::eval_minus_prefix_operator_expression(right),
-            _ => NULL,
+            _ => Object::Error(format!("unknown operator: {}{}", op, right.object_type())),
         }
     }
 
     fn eval_infix_expression(op: String, left: &Object, right: &Object) -> Object {
+        if left.object_type() != right.object_type() {
+            return Object::Error(format!(
+                "type mismatch: {} {} {}",
+                left.object_type(),
+                op,
+                right.object_type()
+            ));
+        }
         match (left, right, op) {
             // 5 == 10, 5 != 10, 5 < 10, 5 > 10 etc.
             (Object::Integer(left), Object::Integer(right), op) => {
                 Self::eval_integer_infix_expression(op, *left, *right)
             }
             // true == true, (5 < 10) == true, etc.
-            (Object::Boolean(left), Object::Boolean(right), op) => match op.as_str() {
-                "==" => Self::native_bool_to_boolean_object(left == right),
-                "!=" => Self::native_bool_to_boolean_object(left != right),
-                _ => NULL,
+            (Object::Boolean(left_bool), Object::Boolean(right_bool), op) => match op.as_str() {
+                "==" => Self::native_bool_to_boolean_object(left_bool == right_bool),
+                "!=" => Self::native_bool_to_boolean_object(left_bool != right_bool),
+                _ => Object::Error(format!(
+                    "unknown operator: {} {} {}",
+                    left.object_type(),
+                    op,
+                    right.object_type()
+                )),
             },
-            _ => NULL,
+            (left, right, op) => Object::Error(format!(
+                "unknown operator: {} {} {}",
+                left.object_type(),
+                op,
+                right.object_type()
+            )),
         }
     }
 
@@ -111,7 +145,7 @@ impl Evaluator {
         for stmt in block.statements {
             result = self.eval_statement(stmt);
 
-            if result.object_type() == "RETURN_VALUE" {
+            if result.object_type() == "RETURN_VALUE" || result.object_type() == "ERROR" {
                 return result;
             }
         }
@@ -130,7 +164,7 @@ impl Evaluator {
     fn eval_minus_prefix_operator_expression(right: Object) -> Object {
         match right {
             Object::Integer(int_value) => Object::Integer(-int_value),
-            _ => NULL,
+            _ => Object::Error(format!("unknown operator: -{}", right.object_type())),
         }
     }
 
@@ -154,6 +188,10 @@ impl Evaluator {
         } else {
             FALSE
         }
+    }
+
+    fn is_error(obj: &Object) -> bool {
+        obj.object_type() == "ERROR"
     }
 }
 
@@ -222,7 +260,7 @@ mod test {
     }
 
     #[test]
-    fn test_eval_bang_operator() {
+    fn test_bang_operator() {
         let tests = vec![
             ("!true", false),
             ("!false", true),
@@ -278,6 +316,37 @@ mod test {
         for test in tests {
             let evaluated = test_eval(test.0);
             test_integer_object(evaluated, test.1);
+        }
+    }
+
+    #[test]
+    fn test_error_handling() {
+        let tests = vec![
+            ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
+            ("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
+            ("-true", "unknown operator: -BOOLEAN"),
+            ("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
+            (
+                "if (10 > 1) {true + false;}",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                "if (10 > 1) { 
+                if (10 > 1) {
+                    return true + false;
+                }
+                return 1;
+            }",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            match evaluated {
+                Object::Error(err) => assert_eq!(err, test.1),
+                other => panic!("no error object returned. Got = {}", other),
+            }
         }
     }
 
