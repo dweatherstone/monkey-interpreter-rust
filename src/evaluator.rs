@@ -1,20 +1,28 @@
+//use std::{cell::RefCell, rc::Rc};
+
 use crate::{
-    ast::{BlockStatement, ExpressionNode, IfExpression, Program, StatementNode},
-    object::Object,
+    ast::{BlockStatement, ExpressionNode, Identifier, IfExpression, Program, StatementNode},
+    object::{Environment, Object},
 };
 
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
 const NULL: Object = Object::Null;
 
-pub struct Evaluator {}
+pub struct Evaluator {
+    //env: Rc<RefCell<Environment>>,
+    env: Environment,
+}
 
 impl Evaluator {
     pub fn new() -> Self {
-        Evaluator {}
+        Evaluator {
+            //env: Rc::new(RefCell::new(Environment::new_environment())),
+            env: Environment::new_environment(),
+        }
     }
 
-    pub fn eval_program(&self, program: Program) -> Object {
+    pub fn eval_program(&mut self, program: Program) -> Object {
         let mut result = Object::Null;
         for stmt in program.statements {
             result = self.eval_statement(stmt);
@@ -31,7 +39,7 @@ impl Evaluator {
         result
     }
 
-    fn eval_statement(&self, stmt: StatementNode) -> Object {
+    fn eval_statement(&mut self, stmt: StatementNode) -> Object {
         match stmt {
             StatementNode::Expression(exp_stmt) => self.eval_expression(exp_stmt.expression),
             StatementNode::Return(ret_stmt) => {
@@ -41,11 +49,18 @@ impl Evaluator {
                 }
                 Object::ReturnValue(Box::new(value))
             }
+            StatementNode::Let(let_stmt) => {
+                let value = self.eval_expression(let_stmt.value);
+                if Self::is_error(&value) {
+                    return value;
+                }
+                self.env.set(let_stmt.name.value, value).unwrap()
+            }
             _ => NULL,
         }
     }
 
-    fn eval_expression(&self, expression: Option<ExpressionNode>) -> Object {
+    fn eval_expression(&mut self, expression: Option<ExpressionNode>) -> Object {
         if let Some(exp) = expression {
             return match exp {
                 ExpressionNode::Integer(int_lit) => Object::Integer(int_lit.value),
@@ -71,6 +86,7 @@ impl Evaluator {
                     Self::eval_infix_expression(infix_exp.operator, &left, &right)
                 }
                 ExpressionNode::IfExpressionNode(if_exp) => self.eval_if_expression(if_exp),
+                ExpressionNode::IdentifierNode(ident) => self.eval_identifier(ident),
                 _ => NULL,
             };
         }
@@ -119,7 +135,7 @@ impl Evaluator {
         }
     }
 
-    fn eval_if_expression(&self, exp: IfExpression) -> Object {
+    fn eval_if_expression(&mut self, exp: IfExpression) -> Object {
         let condition = self.eval_expression(Some(*exp.condition));
         if Self::is_truthy(condition) {
             self.eval_block_statement(exp.consequence)
@@ -127,6 +143,14 @@ impl Evaluator {
             self.eval_block_statement(alt)
         } else {
             NULL
+        }
+    }
+
+    fn eval_identifier(&self, identifier: Identifier) -> Object {
+        let value = self.env.get(identifier.value.clone());
+        match value {
+            Some(val) => val,
+            None => Object::Error(format!("identifier not found: {}", identifier.value)),
         }
     }
 
@@ -139,7 +163,7 @@ impl Evaluator {
         }
     }
 
-    fn eval_block_statement(&self, block: BlockStatement) -> Object {
+    fn eval_block_statement(&mut self, block: BlockStatement) -> Object {
         let mut result = NULL;
 
         for stmt in block.statements {
@@ -340,13 +364,27 @@ mod test {
             }",
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
+            ("foobar", "identifier not found: foobar"),
         ];
         for test in tests {
             let evaluated = test_eval(test.0);
             match evaluated {
                 Object::Error(err) => assert_eq!(err, test.1),
-                other => panic!("no error object returned. Got = {}", other),
+                other => panic!("no error object returned. Got = {:?}", other),
             }
+        }
+    }
+
+    #[test]
+    fn test_let_statements() {
+        let tests = vec![
+            ("let a = 5; a;", 5),
+            ("let a = 5 * 5; a;", 25),
+            ("let a = 5; let b = a; b;", 5),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+        ];
+        for test in tests {
+            test_integer_object(test_eval(test.0), test.1);
         }
     }
 
@@ -354,7 +392,7 @@ mod test {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
-        let evaluator = Evaluator::new();
+        let mut evaluator = Evaluator::new();
         evaluator.eval_program(program.unwrap())
     }
 
