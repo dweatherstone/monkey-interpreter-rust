@@ -187,6 +187,15 @@ impl Evaluator {
                     right.object_type()
                 )),
             },
+            (Object::StringObj(left_str), Object::StringObj(right_str), op) => match op.as_str() {
+                "+" => Object::StringObj(format!("{}{}", left_str, right_str)),
+                _ => Object::Error(format!(
+                    "unknown operator: {} {} {}",
+                    left.object_type(),
+                    op,
+                    right.object_type()
+                )),
+            },
             (left, right, op) => Object::Error(format!(
                 "unknown operator: {} {} {}",
                 left.object_type(),
@@ -426,6 +435,7 @@ mod test {
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
             ("foobar", "identifier not found: foobar"),
+            (r#""Hello" - "World""#, "unknown operator: STRING - STRING"),
         ];
         for test in tests {
             let evaluated = test_eval(test.0);
@@ -520,6 +530,23 @@ mod test {
                 );
             }
             other => panic!("object is not a StringObj. Got = {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let input = r#""Hello" + " " + "World!""#;
+        let evaluated = test_eval(input);
+        match evaluated {
+            Object::StringObj(st) => {
+                assert_eq!(
+                    st.as_str(),
+                    "Hello World!",
+                    "string has the wrong value. Got = {}",
+                    st
+                );
+            }
+            other => panic!("object is not a stringObj. Got = {:?}", other),
         }
     }
 
