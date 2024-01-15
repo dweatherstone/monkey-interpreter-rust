@@ -5,7 +5,7 @@ pub trait Node {
     fn print_string(&self) -> String;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StatementNode {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -15,25 +15,25 @@ pub enum StatementNode {
 
 impl Node for StatementNode {
     fn token_literal(&self) -> String {
-        return match self {
+        match self {
             Self::Let(let_stmt) => let_stmt.token_literal(),
             Self::Return(ret_stmt) => ret_stmt.token_literal(),
-            Self::Expression(expression) => expression.token_literal(),
+            Self::Expression(exp_stmt) => exp_stmt.token_literal(),
             Self::Block(block_stmt) => block_stmt.token_literal(),
-        };
+        }
     }
 
     fn print_string(&self) -> String {
-        return match self {
+        match self {
             Self::Let(let_stmt) => let_stmt.print_string(),
             Self::Return(ret_stmt) => ret_stmt.print_string(),
-            Self::Expression(expression) => expression.print_string(),
+            Self::Expression(exp_stmt) => exp_stmt.print_string(),
             Self::Block(block_stmt) => block_stmt.print_string(),
-        };
+        }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub enum ExpressionNode {
     #[default]
     None,
@@ -49,31 +49,31 @@ pub enum ExpressionNode {
 
 impl Node for ExpressionNode {
     fn token_literal(&self) -> String {
-        return match self {
+        match self {
             Self::IdentifierNode(identifier) => identifier.token_literal(),
             Self::Integer(integer) => integer.token_literal(),
             Self::Prefix(prefix_exp) => prefix_exp.token_literal(),
+            Self::None => String::from(""),
             Self::Infix(infix_exp) => infix_exp.token_literal(),
             Self::BooleanNode(bool_exp) => bool_exp.token_literal(),
             Self::IfExpressionNode(if_exp) => if_exp.token_literal(),
             Self::Function(func_literal) => func_literal.token_literal(),
             Self::Call(call_exp) => call_exp.token_literal(),
-            Self::None => String::from(""),
-        };
+        }
     }
 
     fn print_string(&self) -> String {
-        return match self {
+        match self {
             Self::IdentifierNode(identifier) => identifier.print_string(),
             Self::Integer(integer) => integer.print_string(),
             Self::Prefix(prefix_exp) => prefix_exp.print_string(),
+            Self::None => String::from(""),
             Self::Infix(infix_exp) => infix_exp.print_string(),
             Self::BooleanNode(bool_exp) => bool_exp.print_string(),
             Self::IfExpressionNode(if_exp) => if_exp.print_string(),
             Self::Function(func_literal) => func_literal.print_string(),
             Self::Call(call_exp) => call_exp.print_string(),
-            Self::None => String::from(""),
-        };
+        }
     }
 }
 
@@ -83,16 +83,16 @@ pub struct Program {
 
 impl Node for Program {
     fn token_literal(&self) -> String {
-        return if self.statements.len() > 0 {
+        if !self.statements.is_empty() {
             match &self.statements[0] {
                 StatementNode::Let(let_stmt) => let_stmt.token_literal(),
                 StatementNode::Return(ret_stmt) => ret_stmt.token_literal(),
-                StatementNode::Expression(expression) => expression.token_literal(),
+                StatementNode::Expression(exp_stmt) => exp_stmt.token_literal(),
                 StatementNode::Block(block_stmt) => block_stmt.token_literal(),
             }
         } else {
             String::from("")
-        };
+        }
     }
 
     fn print_string(&self) -> String {
@@ -101,12 +101,11 @@ impl Node for Program {
         for stmt in self.statements.as_slice() {
             out.push_str(stmt.print_string().as_str());
         }
-
         out
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
@@ -120,22 +119,42 @@ impl Node for LetStatement {
 
     fn print_string(&self) -> String {
         let mut out = String::from("");
-
         out.push_str(self.token_literal().as_str());
-        out.push_str(" ");
+        out.push(' ');
         out.push_str(self.name.print_string().as_str());
         out.push_str(" = ");
-
         if let Some(value) = &self.value {
             out.push_str(value.print_string().as_str());
         }
-        out.push_str(";");
-
+        out.push(';');
         out
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
+pub struct ReturnStatement {
+    pub token: Token,
+    pub ret_value: Option<ExpressionNode>,
+}
+
+impl Node for ReturnStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        let mut out = String::from("");
+        out.push_str(self.token_literal().as_str());
+        out.push(' ');
+        if let Some(value) = &self.ret_value {
+            out.push_str(value.print_string().as_str());
+        }
+        out.push(';');
+        out
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Identifier {
     pub token: Token,
     pub value: String,
@@ -151,34 +170,7 @@ impl Node for Identifier {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct ReturnStatement {
-    pub token: Token,
-    pub ret_value: Option<ExpressionNode>,
-}
-
-impl Node for ReturnStatement {
-    fn token_literal(&self) -> String {
-        self.token.literal.clone()
-    }
-
-    fn print_string(&self) -> String {
-        let mut out = String::from("");
-
-        out.push_str(self.token_literal().as_str());
-        out.push_str(" ");
-
-        if let Some(ret_value) = &self.ret_value {
-            out.push_str(ret_value.print_string().as_str());
-        }
-
-        out.push_str(";");
-
-        out
-    }
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Option<ExpressionNode>,
@@ -197,7 +189,7 @@ impl Node for ExpressionStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -213,7 +205,7 @@ impl Node for IntegerLiteral {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: String,
@@ -227,16 +219,39 @@ impl Node for PrefixExpression {
 
     fn print_string(&self) -> String {
         let mut out = String::from("");
-        out.push_str("(");
+        out.push('(');
         out.push_str(self.operator.as_str());
         out.push_str(self.right.print_string().as_str());
-        out.push_str(")");
-
+        out.push(')');
         out
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
+pub struct InfixExpression {
+    pub token: Token,
+    pub operator: String,
+    pub left: Box<ExpressionNode>,
+    pub right: Box<ExpressionNode>,
+}
+
+impl Node for InfixExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        let mut out = String::from("");
+        out.push('(');
+        out.push_str(self.left.print_string().as_str());
+        out.push_str(format!(" {} ", self.operator).as_str());
+        out.push_str(self.right.print_string().as_str());
+        out.push(')');
+        out
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Boolean {
     pub token: Token,
     pub value: bool,
@@ -252,32 +267,7 @@ impl Node for Boolean {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct InfixExpression {
-    pub token: Token,
-    pub left: Box<ExpressionNode>,
-    pub operator: String,
-    pub right: Box<ExpressionNode>,
-}
-
-impl Node for InfixExpression {
-    fn token_literal(&self) -> String {
-        self.token.literal.clone()
-    }
-
-    fn print_string(&self) -> String {
-        let mut out = String::from("");
-        out.push_str("(");
-        out.push_str(self.left.print_string().as_str());
-        out.push_str(format!(" {} ", self.operator).as_str());
-        out.push_str(self.right.print_string().as_str());
-        out.push_str(")");
-
-        out
-    }
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Box<ExpressionNode>,
@@ -292,22 +282,39 @@ impl Node for IfExpression {
 
     fn print_string(&self) -> String {
         let mut out = String::from("");
-
         out.push_str("if");
         out.push_str(self.condition.print_string().as_str());
-        out.push_str(" ");
+        out.push(' ');
         out.push_str(self.consequence.print_string().as_str());
-
         if let Some(alt) = &self.alternative {
             out.push_str("else ");
             out.push_str(alt.print_string().as_str());
         }
-
         out
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
+pub struct BlockStatement {
+    pub token: Token,
+    pub statements: Vec<StatementNode>,
+}
+
+impl Node for BlockStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        let mut out = String::from("");
+        for stmt in &self.statements {
+            out.push_str(stmt.print_string().as_str());
+        }
+        out
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<Identifier>,
@@ -321,23 +328,22 @@ impl Node for FunctionLiteral {
 
     fn print_string(&self) -> String {
         let mut out = String::from("");
-        let mut params = vec![];
+        let mut params = Vec::new();
 
         for param in &self.parameters {
             params.push(param.print_string());
         }
 
         out.push_str(self.token_literal().as_str());
-        out.push_str("(");
+        out.push('(');
         out.push_str(params.join(", ").as_str());
-        out.push_str(")");
+        out.push(')');
         out.push_str(self.body.print_string().as_str());
-
         out
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Box<ExpressionNode>,
@@ -351,39 +357,15 @@ impl Node for CallExpression {
 
     fn print_string(&self) -> String {
         let mut out = String::from("");
-        let mut args = vec![];
-
+        let mut args = Vec::new();
         for arg in &self.arguments {
             args.push(arg.print_string());
         }
 
         out.push_str(self.function.print_string().as_str());
-        out.push_str("(");
+        out.push('(');
         out.push_str(args.join(", ").as_str());
-        out.push_str(")");
-
-        out
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct BlockStatement {
-    pub token: Token,
-    pub statements: Vec<StatementNode>,
-}
-
-impl Node for BlockStatement {
-    fn token_literal(&self) -> String {
-        self.token.literal.clone()
-    }
-
-    fn print_string(&self) -> String {
-        let mut out = String::from("");
-
-        for stmt in &self.statements {
-            out.push_str(stmt.print_string().as_str());
-        }
-
+        out.push(')');
         out
     }
 }
@@ -425,7 +407,7 @@ mod test {
         assert_eq!(
             program.print_string(),
             String::from("let myVar = anotherVar;"),
-            "print string wrong. got = {}",
+            "print string wrong. Got = '{}'",
             program.print_string()
         );
     }

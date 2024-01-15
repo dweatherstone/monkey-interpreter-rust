@@ -6,7 +6,7 @@ pub struct Token {
     pub literal: String,
 }
 
-#[derive(PartialEq, Debug, Default, Clone, Hash, Eq)]
+#[derive(PartialEq, Debug, Default, Clone, Eq, Hash)]
 pub enum TokenKind {
     #[default]
     Illegal,
@@ -24,7 +24,6 @@ pub enum TokenKind {
 
     Lt,
     Gt,
-
     Eq,
     NotEq,
 
@@ -54,6 +53,14 @@ impl Display for TokenKind {
             TokenKind::Int => write!(f, "Int"),
             TokenKind::Assign => write!(f, "="),
             TokenKind::Plus => write!(f, "+"),
+            TokenKind::Minus => write!(f, "-"),
+            TokenKind::Bang => write!(f, "!"),
+            TokenKind::Asterisk => write!(f, "*"),
+            TokenKind::Slash => write!(f, "/"),
+            TokenKind::Lt => write!(f, "<"),
+            TokenKind::Gt => write!(f, ">"),
+            TokenKind::Eq => write!(f, "=="),
+            TokenKind::NotEq => write!(f, "!="),
             TokenKind::Comma => write!(f, ","),
             TokenKind::Semicolon => write!(f, ";"),
             TokenKind::Lparen => write!(f, "("),
@@ -62,31 +69,23 @@ impl Display for TokenKind {
             TokenKind::Rbrace => write!(f, "}}"),
             TokenKind::Function => write!(f, "Function"),
             TokenKind::Let => write!(f, "Let"),
-            TokenKind::Minus => write!(f, "-"),
-            TokenKind::Slash => write!(f, "/"),
-            TokenKind::Bang => write!(f, "!"),
-            TokenKind::Asterisk => write!(f, "*"),
-            TokenKind::Lt => write!(f, "<"),
-            TokenKind::Gt => write!(f, ">"),
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
             TokenKind::If => write!(f, "if"),
             TokenKind::Else => write!(f, "else"),
             TokenKind::Return => write!(f, "return"),
-            TokenKind::Eq => write!(f, "=="),
-            TokenKind::NotEq => write!(f, "!="),
         }
     }
 }
 
-pub fn lookup_ident(identifier: &String) -> TokenKind {
-    match identifier.as_str() {
+pub fn lookup_ident(identifier: &str) -> TokenKind {
+    match identifier {
         "fn" => TokenKind::Function,
         "let" => TokenKind::Let,
-        "true" => TokenKind::True,
-        "false" => TokenKind::False,
         "if" => TokenKind::If,
         "else" => TokenKind::Else,
+        "true" => TokenKind::True,
+        "false" => TokenKind::False,
         "return" => TokenKind::Return,
         _ => TokenKind::Ident,
     }
