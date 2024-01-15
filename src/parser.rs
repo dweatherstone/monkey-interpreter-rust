@@ -4,7 +4,7 @@ use crate::{
     ast::{
         BlockStatement, Boolean, CallExpression, ExpressionNode, ExpressionStatement,
         FunctionLiteral, Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement,
-        PrefixExpression, Program, ReturnStatement, StatementNode,
+        PrefixExpression, Program, ReturnStatement, StatementNode, StringLiteral,
     },
     lexer::Lexer,
     token::{Token, TokenKind},
@@ -68,6 +68,7 @@ impl Parser {
         parser.register_prefix(TokenKind::Lparen, Self::parse_grouped_expression);
         parser.register_prefix(TokenKind::If, Self::parse_if_expression);
         parser.register_prefix(TokenKind::Function, Self::parse_function_literal);
+        parser.register_prefix(TokenKind::String, Self::parse_string_literal);
 
         parser.register_infix(TokenKind::Plus, Self::parse_infix_expression);
         parser.register_infix(TokenKind::Minus, Self::parse_infix_expression);
@@ -196,6 +197,13 @@ impl Parser {
         literal.body = self.parse_block_statement();
 
         Some(ExpressionNode::Function(literal))
+    }
+
+    fn parse_string_literal(&mut self) -> Option<ExpressionNode> {
+        Some(ExpressionNode::StringExp(StringLiteral {
+            token: self.cur_token.clone(),
+            value: self.cur_token.literal.clone(),
+        }))
     }
 
     fn parse_block_statement(&mut self) -> BlockStatement {
@@ -1165,6 +1173,38 @@ mod test {
                 }
                 other => panic!("expression is not Function Literal. Got = {:?}", other),
             },
+            other => panic!(
+                "program.statements[0] is not ExpressionStatement. Got = {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn test_string_literal_expression() {
+        let input = r#""hello world";"#;
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+        check_parser_errors(parser);
+
+        match &program.statements[0] {
+            StatementNode::Expression(exp_stmt) => {
+                match &exp_stmt
+                    .expression
+                    .as_ref()
+                    .expect("error parsing expression")
+                {
+                    ExpressionNode::StringExp(str_lit) => {
+                        assert_eq!(
+                            str_lit.value, "hello world",
+                            "str_lit value not 'hello world'. Got = {}",
+                            str_lit.value
+                        );
+                    }
+                    other => panic!("not a StringLiteral. Got = {:?}", other),
+                }
+            }
             other => panic!(
                 "program.statements[0] is not ExpressionStatement. Got = {:?}",
                 other

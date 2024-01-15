@@ -14,6 +14,7 @@ pub enum TokenKind {
 
     Ident,
     Int,
+    String,
 
     Assign,
     Plus,
@@ -51,6 +52,7 @@ impl Display for TokenKind {
             TokenKind::Eof => write!(f, "Eof"),
             TokenKind::Ident => write!(f, "Ident"),
             TokenKind::Int => write!(f, "Int"),
+            TokenKind::String => write!(f, "String"),
             TokenKind::Assign => write!(f, "="),
             TokenKind::Plus => write!(f, "+"),
             TokenKind::Minus => write!(f, "-"),
