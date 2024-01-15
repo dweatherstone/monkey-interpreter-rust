@@ -9,7 +9,7 @@ use crate::{
 
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
-const NULL: Object = Object::Null;
+pub const NULL: Object = Object::Null;
 
 pub struct Evaluator {
     //env: Rc<RefCell<Environment>>,
@@ -123,6 +123,7 @@ impl Evaluator {
                 self.env = old_env;
                 Self::unwrap_return_value(evaluated)
             }
+            Object::Builtin(b_fn) => b_fn(args),
             other => Object::Error(format!("not a function: {}", other.object_type())),
         }
     }
@@ -291,6 +292,8 @@ impl Evaluator {
 
 #[cfg(test)]
 mod test {
+    use std::any;
+
     use crate::{ast::Node, lexer::Lexer, object::Object, parser::Parser};
 
     use super::Evaluator;
@@ -547,6 +550,40 @@ mod test {
                 );
             }
             other => panic!("object is not a stringObj. Got = {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        let tests: Vec<(&str, Box<dyn any::Any>)> = vec![
+            (r#"len("")"#, Box::new(0_i64)),
+            (r#"len("four")"#, Box::new(4_i64)),
+            (r#"len("hello world")"#, Box::new(11_i64)),
+            (
+                "len(1)",
+                Box::new(String::from("argument to 'len' not supported. Got INTEGER")),
+            ),
+            (
+                r#"len("one", "two")"#,
+                Box::new(String::from("wrong number of arguments. Got = 2, want = 1")),
+            ),
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            match test.1.downcast_ref::<i64>() {
+                Some(expected) => test_integer_object(evaluated, *expected),
+                None => match test.1.downcast_ref::<String>() {
+                    Some(expected) => match evaluated {
+                        Object::Error(err) => assert_eq!(
+                            err, *expected,
+                            "wrong error message. Expected = {}, got = {}",
+                            *expected, err
+                        ),
+                        other => panic!("object is not Error. Got = {:?}", other),
+                    },
+                    None => panic!("should not happen!"),
+                },
+            }
         }
     }
 
