@@ -103,7 +103,10 @@ impl Evaluator {
                     if args.len() == 1 && Self::is_error(&args[0]) {
                         return args[0].clone();
                     }
+<<<<<<< HEAD
 
+=======
+>>>>>>> temp-branch
                     self.apply_function(function, args)
                 }
                 _ => NULL,
@@ -116,7 +119,11 @@ impl Evaluator {
         match func {
             Object::Func(function) => {
                 let old_env = self.env.clone();
+<<<<<<< HEAD
+                let extended_env = self.extended_function_env(function.clone(), args);
+=======
                 let extended_env = self.extend_function_env(function.clone(), args);
+>>>>>>> temp-branch
                 self.env = extended_env;
                 let evaluated = self.eval_block_statement(function.body);
                 self.env = old_env;
@@ -126,9 +133,15 @@ impl Evaluator {
         }
     }
 
+<<<<<<< HEAD
+    fn extended_function_env(&self, function: Function, args: Vec<Object>) -> Environment {
+        let mut env = Environment::new_enclosed_environment(Box::new(function.env));
+        for (idx, param) in function.parameters.into_iter().enumerate() {
+=======
     fn extend_function_env(&self, func: Function, args: Vec<Object>) -> Environment {
         let mut env = Environment::new_enclosed_environment(Box::new(func.env));
         for (idx, param) in func.parameters.into_iter().enumerate() {
+>>>>>>> temp-branch
             env.set(param.value, args[idx].clone());
         }
         env
@@ -141,10 +154,17 @@ impl Evaluator {
         }
     }
 
+<<<<<<< HEAD
+    fn eval_expressions(&mut self, expressions: Vec<ExpressionNode>) -> Vec<Object> {
+        let mut result = Vec::new();
+        for exp in expressions {
+            let evaluated = self.eval_expression(Some(exp));
+=======
     fn eval_expressions(&mut self, exps: Vec<ExpressionNode>) -> Vec<Object> {
         let mut result = Vec::new();
         for expression in exps {
             let evaluated = self.eval_expression(Some(expression));
+>>>>>>> temp-branch
             if Self::is_error(&evaluated) {
                 return vec![evaluated];
             }
@@ -455,7 +475,11 @@ mod test {
 
     #[test]
     fn test_function_object() {
+<<<<<<< HEAD
+        let input = "fn(x) { x + 2; }";
+=======
         let input = "fn(x) { x + 2; };";
+>>>>>>> temp-branch
         let evaluated = test_eval(input);
 
         match evaluated {
@@ -489,8 +513,13 @@ mod test {
             ("let identity = fn(x) { x; }; identity(5);", 5),
             ("let identity = fn(x) { return x; }; identity(5);", 5),
             ("let double = fn(x) { x * 2; }; double(5);", 10),
+<<<<<<< HEAD
+            ("let add = fn(x, y) { x + y; }; add(5, 6);", 11),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, 5 + 5);", 20),
+=======
             ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
             ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+>>>>>>> temp-branch
             ("fn(x) { x; }(5);", 5),
         ];
         for test in tests {
@@ -498,6 +527,8 @@ mod test {
         }
     }
 
+<<<<<<< HEAD
+=======
     #[test]
     fn test_closures() {
         let input = "
@@ -510,6 +541,7 @@ mod test {
         test_integer_object(test_eval(input), 4);
     }
 
+>>>>>>> temp-branch
     fn test_eval(input: &str) -> Object {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
