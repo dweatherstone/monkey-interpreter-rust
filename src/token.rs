@@ -35,6 +35,8 @@ pub enum TokenKind {
     Rparen,
     Lbrace,
     Rbrace,
+    Lbracket,
+    Rbracket,
 
     Function,
     Let,
@@ -69,6 +71,8 @@ impl Display for TokenKind {
             TokenKind::Rparen => write!(f, ")"),
             TokenKind::Lbrace => write!(f, "{{"),
             TokenKind::Rbrace => write!(f, "}}"),
+            TokenKind::Lbracket => write!(f, "["),
+            TokenKind::Rbracket => write!(f, "]"),
             TokenKind::Function => write!(f, "Function"),
             TokenKind::Let => write!(f, "Let"),
             TokenKind::True => write!(f, "true"),

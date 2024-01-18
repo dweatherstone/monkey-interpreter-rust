@@ -107,6 +107,24 @@ impl Evaluator {
                     self.apply_function(function, args)
                 }
                 ExpressionNode::StringExp(str_lit) => Object::StringObj(str_lit.value),
+                ExpressionNode::Array(array_lit) => {
+                    let elements = self.eval_expressions(array_lit.elements);
+                    if elements.len() == 1 && Self::is_error(&elements[0]) {
+                        return elements[0].clone();
+                    }
+                    Object::Array(elements)
+                }
+                ExpressionNode::Index(index_exp) => {
+                    let left = self.eval_expression(Some(*index_exp.left));
+                    if Self::is_error(&left) {
+                        return left;
+                    }
+                    let index = self.eval_expression(Some(*index_exp.index));
+                    if Self::is_error(&index) {
+                        return index;
+                    }
+                    self.eval_index_expression(left, index)
+                }
                 _ => NULL,
             };
         }
@@ -225,6 +243,30 @@ impl Evaluator {
         }
     }
 
+    fn eval_index_expression(&self, left: Object, index: Object) -> Object {
+        if left.object_type() == "ARRAY" && index.object_type() == "INTEGER" {
+            Self::eval_array_index_expression(left, index)
+        } else {
+            Object::Error(format!(
+                "index operator not supported: {}",
+                left.object_type()
+            ))
+        }
+    }
+
+    fn eval_array_index_expression(array: Object, index: Object) -> Object {
+        if let Object::Array(arr) = array {
+            if let Object::Integer(idx) = index {
+                let max = (arr.len() - 1) as i64;
+                if idx < 0 || idx > max {
+                    return NULL;
+                }
+                return arr[(idx) as usize].clone();
+            }
+        }
+        NULL
+    }
+
     fn is_truthy(obj: Object) -> bool {
         match obj {
             Object::Null => false,
@@ -296,7 +338,7 @@ mod test {
 
     use crate::{ast::Node, lexer::Lexer, object::Object, parser::Parser};
 
-    use super::Evaluator;
+    use super::{Evaluator, NULL};
 
     #[test]
     fn test_eval_integer_expression() {
@@ -439,6 +481,7 @@ mod test {
             ),
             ("foobar", "identifier not found: foobar"),
             (r#""Hello" - "World""#, "unknown operator: STRING - STRING"),
+            ("5[0]", "index operator not supported: INTEGER"),
         ];
         for test in tests {
             let evaluated = test_eval(test.0);
@@ -567,6 +610,33 @@ mod test {
                 r#"len("one", "two")"#,
                 Box::new(String::from("wrong number of arguments. Got = 2, want = 1")),
             ),
+            ("len([1, 2, 3]);", Box::new(3_i64)),
+            ("len([]);", Box::new(0_i64)),
+            (r#"len(["a", 4, "Hello" + " World!"]);"#, Box::new(3_i64)),
+            ("first([1, 2, 3]);", Box::new(1_i64)),
+            ("first([])", Box::new(NULL)),
+            (
+                "first(1)",
+                Box::new(String::from(
+                    "argument to 'first' not supported. Got INTEGER",
+                )),
+            ),
+            (
+                r#"first("one", "two")"#,
+                Box::new(String::from("wrong number of arguments. Got = 2, want = 1")),
+            ),
+            ("last([1, 2, 3]);", Box::new(3_i64)),
+            ("last([])", Box::new(NULL)),
+            (
+                "last(1)",
+                Box::new(String::from(
+                    "argument to 'first' not supported. Got INTEGER",
+                )),
+            ),
+            (
+                r#"last("one", "two")"#,
+                Box::new(String::from("wrong number of arguments. Got = 2, want = 1")),
+            ),
         ];
         for test in tests {
             let evaluated = test_eval(test.0);
@@ -581,8 +651,57 @@ mod test {
                         ),
                         other => panic!("object is not Error. Got = {:?}", other),
                     },
-                    None => panic!("should not happen!"),
+                    None => test_null_object(evaluated),
                 },
+            }
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        let evaluated = test_eval(input);
+        match evaluated {
+            Object::Array(elements) => {
+                assert_eq!(
+                    elements.len(),
+                    3,
+                    "array has wrong num of elements. Got = {}",
+                    elements.len()
+                );
+                test_integer_object(elements[0].clone(), 1);
+                test_integer_object(elements[1].clone(), 4);
+                test_integer_object(elements[2].clone(), 6);
+            }
+            other => panic!("object is not array. Got = {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_array_index_expressions() {
+        let tests: Vec<(&str, Box<dyn any::Any>)> = vec![
+            ("[1, 2, 3][0]", Box::new(1_i64)),
+            ("[1, 2, 3][1]", Box::new(2_i64)),
+            ("[1, 2, 3][2]", Box::new(3_i64)),
+            ("let i = 0; [1][i];", Box::new(1_i64)),
+            ("[1, 2, 3][1 + 1];", Box::new(3_i64)),
+            ("let myArray = [1, 2, 3]; myArray[2];", Box::new(3_i64)),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                Box::new(6_i64),
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                Box::new(2_i64),
+            ),
+            ("[1, 2, 3][3]", Box::new(NULL)),
+            ("[1, 2, 3][-1]", Box::new(NULL)),
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            match test.1.downcast_ref::<i64>() {
+                Some(expected) => test_integer_object(evaluated, *expected),
+                None => test_null_object(evaluated),
             }
         }
     }
@@ -618,10 +737,6 @@ mod test {
     }
 
     fn test_null_object(obj: Object) {
-        // match obj {
-        //     Object::Null => assert!(true),
-        //     _ => assert!(false),
-        // }
         assert!(obj.object_type() == *"NULL");
     }
 }

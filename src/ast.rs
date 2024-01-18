@@ -46,6 +46,8 @@ pub enum ExpressionNode {
     Function(FunctionLiteral),
     Call(CallExpression),
     StringExp(StringLiteral),
+    Array(ArrayLiteral),
+    Index(IndexExpression),
 }
 
 impl Node for ExpressionNode {
@@ -61,6 +63,8 @@ impl Node for ExpressionNode {
             Self::Function(func_literal) => func_literal.token_literal(),
             Self::Call(call_exp) => call_exp.token_literal(),
             Self::StringExp(str_exp) => str_exp.token_literal(),
+            Self::Array(arr_lit) => arr_lit.token_literal(),
+            Self::Index(ind_exp) => ind_exp.token_literal(),
         }
     }
 
@@ -76,6 +80,8 @@ impl Node for ExpressionNode {
             Self::Function(func_literal) => func_literal.print_string(),
             Self::Call(call_exp) => call_exp.print_string(),
             Self::StringExp(str_exp) => str_exp.print_string(),
+            Self::Array(arr_lit) => arr_lit.print_string(),
+            Self::Index(ind_exp) => ind_exp.print_string(),
         }
     }
 }
@@ -385,6 +391,54 @@ impl Node for CallExpression {
         out.push('(');
         out.push_str(args.join(", ").as_str());
         out.push(')');
+        out
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ArrayLiteral {
+    pub token: Token,
+    pub elements: Vec<ExpressionNode>,
+}
+
+impl Node for ArrayLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        let mut out = String::from("");
+        let mut elems = Vec::new();
+        for elem in &self.elements {
+            elems.push(elem.print_string());
+        }
+        out.push('[');
+        out.push_str(elems.join(", ").as_str());
+        out.push(']');
+        out
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexExpression {
+    pub token: Token,
+    pub left: Box<ExpressionNode>,
+    pub index: Box<ExpressionNode>,
+}
+
+impl Node for IndexExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        let mut out = String::from("");
+
+        out.push('(');
+        out.push_str(self.left.print_string().as_str());
+        out.push('[');
+        out.push_str(self.index.print_string().as_str());
+        out.push_str("])");
         out
     }
 }
