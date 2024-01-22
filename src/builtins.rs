@@ -69,7 +69,7 @@ fn b_last(args: Vec<Object>) -> Object {
             }
         }
         other => Object::Error(format!(
-            "argument to 'first' not supported. Got {}",
+            "argument to 'last' not supported. Got {}",
             other.object_type()
         )),
     }

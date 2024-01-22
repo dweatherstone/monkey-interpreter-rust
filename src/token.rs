@@ -30,6 +30,7 @@ pub enum TokenKind {
 
     Comma,
     Semicolon,
+    Colon,
 
     Lparen,
     Rparen,
@@ -67,6 +68,7 @@ impl Display for TokenKind {
             TokenKind::NotEq => write!(f, "!="),
             TokenKind::Comma => write!(f, ","),
             TokenKind::Semicolon => write!(f, ";"),
+            TokenKind::Colon => write!(f, ":"),
             TokenKind::Lparen => write!(f, "("),
             TokenKind::Rparen => write!(f, ")"),
             TokenKind::Lbrace => write!(f, "{{"),

@@ -48,6 +48,7 @@ pub enum ExpressionNode {
     StringExp(StringLiteral),
     Array(ArrayLiteral),
     Index(IndexExpression),
+    Hash(HashLiteral),
 }
 
 impl Node for ExpressionNode {
@@ -65,6 +66,7 @@ impl Node for ExpressionNode {
             Self::StringExp(str_exp) => str_exp.token_literal(),
             Self::Array(arr_lit) => arr_lit.token_literal(),
             Self::Index(ind_exp) => ind_exp.token_literal(),
+            Self::Hash(hash_exp) => hash_exp.token_literal(),
         }
     }
 
@@ -82,6 +84,7 @@ impl Node for ExpressionNode {
             Self::StringExp(str_exp) => str_exp.print_string(),
             Self::Array(arr_lit) => arr_lit.print_string(),
             Self::Index(ind_exp) => ind_exp.print_string(),
+            Self::Hash(hash_exp) => hash_exp.print_string(),
         }
     }
 }
@@ -439,6 +442,30 @@ impl Node for IndexExpression {
         out.push('[');
         out.push_str(self.index.print_string().as_str());
         out.push_str("])");
+        out
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct HashLiteral {
+    pub token: Token, // {
+    pub pairs: Vec<(ExpressionNode, ExpressionNode)>,
+}
+
+impl Node for HashLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        let mut out = String::new();
+        let mut pairs = Vec::new();
+        for (key, value) in &self.pairs {
+            pairs.push(format!("{}: {}", key.print_string(), value.print_string()))
+        }
+        out.push('{');
+        out.push_str(pairs.join(", ").as_str());
+        out.push('}');
         out
     }
 }

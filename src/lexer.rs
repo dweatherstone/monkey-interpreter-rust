@@ -78,6 +78,7 @@ impl Lexer {
             },
             '[' => Lexer::new_token(TokenKind::Lbracket, self.ch),
             ']' => Lexer::new_token(TokenKind::Rbracket, self.ch),
+            ':' => Lexer::new_token(TokenKind::Colon, self.ch),
             _ => {
                 return if Lexer::is_letter(self.ch) {
                     let literal = self.read_identifier();
@@ -243,6 +244,7 @@ mod test {
         "foobar"
         "foo bar"
         [1, 2];
+        {"foo": "bar"}
         "#;
         let expected: Vec<Token> = vec![
             Token {
@@ -568,6 +570,27 @@ mod test {
             Token {
                 kind: TokenKind::Semicolon,
                 literal: ";".to_string(),
+            },
+            // {"foo": "bar"}
+            Token {
+                kind: TokenKind::Lbrace,
+                literal: "{".to_string(),
+            },
+            Token {
+                kind: TokenKind::String,
+                literal: "foo".to_string(),
+            },
+            Token {
+                kind: TokenKind::Colon,
+                literal: ":".to_string(),
+            },
+            Token {
+                kind: TokenKind::String,
+                literal: "bar".to_string(),
+            },
+            Token {
+                kind: TokenKind::Rbrace,
+                literal: "}".to_string(),
             },
             Token {
                 kind: TokenKind::Eof,

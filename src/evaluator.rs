@@ -630,28 +630,56 @@ mod test {
             (
                 "last(1)",
                 Box::new(String::from(
-                    "argument to 'first' not supported. Got INTEGER",
+                    "argument to 'last' not supported. Got INTEGER",
                 )),
             ),
             (
                 r#"last("one", "two")"#,
                 Box::new(String::from("wrong number of arguments. Got = 2, want = 1")),
             ),
+            ("rest([2, 3, 4])", Box::new(vec![3_i64, 4_i64])),
+            ("rest([4])", Box::<Vec<i64>>::default()),
+            ("rest([])", Box::new(NULL)),
+            (
+                "rest(123)",
+                Box::new(String::from(
+                    "argument to 'rest' not supported. Got INTEGER",
+                )),
+            ),
+            (
+                "push([1, 2, 3], 4)",
+                Box::new(vec![1_i64, 2_i64, 3_i64, 4_i64]),
+            ),
+            (
+                "push([1, 2, 3])",
+                Box::new(String::from("wrong number of arguments. Got = 1, want = 2")),
+            ),
+            (
+                "push(123, 4)",
+                Box::new(String::from(
+                    "argument to 'push' must be ARRAY. Got INTEGER",
+                )),
+            ),
         ];
         for test in tests {
             let evaluated = test_eval(test.0);
             match test.1.downcast_ref::<i64>() {
                 Some(expected) => test_integer_object(evaluated, *expected),
-                None => match test.1.downcast_ref::<String>() {
-                    Some(expected) => match evaluated {
-                        Object::Error(err) => assert_eq!(
-                            err, *expected,
-                            "wrong error message. Expected = {}, got = {}",
-                            *expected, err
-                        ),
-                        other => panic!("object is not Error. Got = {:?}", other),
+                None => match test.1.downcast_ref::<Vec<i64>>() {
+                    Some(expected) => {
+                        test_array_integer_object(evaluated, expected.to_owned());
+                    }
+                    None => match test.1.downcast_ref::<String>() {
+                        Some(expected) => match evaluated {
+                            Object::Error(err) => assert_eq!(
+                                err, *expected,
+                                "wrong error message. Expected = {}, got = {}",
+                                *expected, err
+                            ),
+                            other => panic!("object is not Error. Got = {:?}", other),
+                        },
+                        None => test_null_object(evaluated),
                     },
-                    None => test_null_object(evaluated),
                 },
             }
         }
@@ -661,20 +689,7 @@ mod test {
     fn test_array_literals() {
         let input = "[1, 2 * 2, 3 + 3]";
         let evaluated = test_eval(input);
-        match evaluated {
-            Object::Array(elements) => {
-                assert_eq!(
-                    elements.len(),
-                    3,
-                    "array has wrong num of elements. Got = {}",
-                    elements.len()
-                );
-                test_integer_object(elements[0].clone(), 1);
-                test_integer_object(elements[1].clone(), 4);
-                test_integer_object(elements[2].clone(), 6);
-            }
-            other => panic!("object is not array. Got = {:?}", other),
-        }
+        test_array_integer_object(evaluated, vec![1_i64, 4_i64, 6_i64]);
     }
 
     #[test]
@@ -733,6 +748,24 @@ mod test {
                 bool_value, expected
             ),
             other => panic!("object is not bool. Got = {:?}", other),
+        }
+    }
+
+    fn test_array_integer_object(obj: Object, expected: Vec<i64>) {
+        match obj {
+            Object::Array(elements) => {
+                assert_eq!(
+                    elements.len(),
+                    expected.len(),
+                    "array has wrong num of elements. Got = {}, expected = {}",
+                    elements.len(),
+                    expected.len()
+                );
+                for (idx, expect) in expected.into_iter().enumerate() {
+                    test_integer_object(elements[idx].clone(), expect);
+                }
+            }
+            other => panic!("object is not array. Got = {:?}", other),
         }
     }
 
