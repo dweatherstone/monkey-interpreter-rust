@@ -80,7 +80,7 @@ impl Display for Object {
             Self::HashObj(hash) => {
                 let mut out = String::new();
                 let mut pairs = Vec::new();
-                for (_, pair) in &hash.pairs {
+                for pair in hash.pairs.values() {
                     pairs.push(format!("{}: {}", pair.key, pair.value));
                 }
 

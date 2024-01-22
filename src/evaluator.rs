@@ -17,13 +17,6 @@ pub struct Evaluator {
 }
 
 impl Evaluator {
-    pub fn new() -> Self {
-        Evaluator {
-            //env: Rc::new(RefCell::new(Environment::new_environment())),
-            env: Environment::new_environment(),
-        }
-    }
-
     pub fn eval_program(&mut self, program: Program) -> Object {
         let mut result = Object::Null;
         for stmt in program.statements {
@@ -369,6 +362,14 @@ impl Evaluator {
 
     fn is_error(obj: &Object) -> bool {
         obj.object_type() == "ERROR"
+    }
+}
+
+impl Default for Evaluator {
+    fn default() -> Self {
+        Evaluator {
+            env: Environment::new_environment(),
+        }
     }
 }
 
@@ -836,7 +837,7 @@ mod test {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
-        let mut evaluator = Evaluator::new();
+        let mut evaluator = Evaluator::default();
         evaluator.eval_program(program.unwrap())
     }
 

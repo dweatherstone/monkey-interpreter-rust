@@ -1393,11 +1393,9 @@ mod test {
                             (String::from("two"), 2),
                             (String::from("three"), 3),
                         ];
-                        let mut curr_idx: usize = 0;
-                        for (_, value) in &hash_exp.pairs {
+                        for (curr_idx, (_, value)) in hash_exp.pairs.iter().enumerate() {
                             let expected_value = expected[curr_idx].1;
                             test_integer_literal(value, expected_value);
-                            curr_idx += 1;
                         }
                     }
                     other => panic!("not a HashLiteral. Got = {:?}", other),
@@ -1472,8 +1470,8 @@ mod test {
                             (String::from("two"), (10, "-", 8)),
                             (String::from("three"), (15, "/", 5)),
                         ];
-                        let mut curr_idx: usize = 0;
-                        for (_, value) in &hash_exp.pairs {
+                        //let mut curr_idx: usize = 0;
+                        for (curr_idx, (_, value)) in hash_exp.pairs.iter().enumerate() {
                             let expected_value = expected[curr_idx].1;
                             test_func_for_key(
                                 value,
@@ -1481,7 +1479,6 @@ mod test {
                                 expected_value.1,
                                 expected_value.2,
                             );
-                            curr_idx += 1;
                         }
                     }
                     other => panic!("not a HashLiteral. Got = {:?}", other),
