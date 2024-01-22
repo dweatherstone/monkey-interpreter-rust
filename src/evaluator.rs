@@ -1,10 +1,10 @@
 //use std::{cell::RefCell, rc::Rc};
 
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
 use crate::{
     ast::{BlockStatement, ExpressionNode, Identifier, IfExpression, Program, StatementNode},
-    object::{Environment, Function, Object},
+    object::{Environment, Function, HashPair, HashStruct, Hashable, Object},
 };
 
 const TRUE: Object = Object::Boolean(true);
@@ -124,6 +124,27 @@ impl Evaluator {
                         return index;
                     }
                     self.eval_index_expression(left, index)
+                }
+                ExpressionNode::Hash(hash) => {
+                    let mut pairs = HashMap::new();
+                    for (k, v) in hash.pairs {
+                        let key = self.eval_expression(Some(k));
+                        if Self::is_error(&key) {
+                            return key;
+                        }
+                        let hash_key = match key.hash_key() {
+                            Ok(hash) => hash,
+                            Err(err_str) => return Object::Error(err_str.to_string()),
+                        };
+
+                        let value = self.eval_expression(Some(v));
+                        if Self::is_error(&value) {
+                            return value;
+                        }
+
+                        pairs.insert(hash_key, HashPair { key, value });
+                    }
+                    Object::HashObj(HashStruct { pairs })
                 }
                 _ => NULL,
             };
@@ -246,6 +267,8 @@ impl Evaluator {
     fn eval_index_expression(&self, left: Object, index: Object) -> Object {
         if left.object_type() == "ARRAY" && index.object_type() == "INTEGER" {
             Self::eval_array_index_expression(left, index)
+        } else if left.object_type() == "HASH" {
+            Self::eval_hash_index_expression(left, index)
         } else {
             Object::Error(format!(
                 "index operator not supported: {}",
@@ -265,6 +288,23 @@ impl Evaluator {
             }
         }
         NULL
+    }
+
+    fn eval_hash_index_expression(hash: Object, index: Object) -> Object {
+        match hash {
+            Object::HashObj(hash) => {
+                let key = match index.hash_key() {
+                    Ok(key) => key,
+                    Err(err) => return Object::Error(err),
+                };
+                let pair = match hash.pairs.get(&key) {
+                    Some(pair) => pair,
+                    None => return NULL,
+                };
+                pair.value.clone()
+            }
+            _ => panic!("cannot happen!"),
+        }
     }
 
     fn is_truthy(obj: Object) -> bool {
@@ -336,9 +376,14 @@ impl Evaluator {
 mod test {
     use std::any;
 
-    use crate::{ast::Node, lexer::Lexer, object::Object, parser::Parser};
+    use crate::{
+        ast::Node,
+        lexer::Lexer,
+        object::{Hashable, Object},
+        parser::Parser,
+    };
 
-    use super::{Evaluator, NULL};
+    use super::{Evaluator, FALSE, NULL, TRUE};
 
     #[test]
     fn test_eval_integer_expression() {
@@ -482,6 +527,10 @@ mod test {
             ("foobar", "identifier not found: foobar"),
             (r#""Hello" - "World""#, "unknown operator: STRING - STRING"),
             ("5[0]", "index operator not supported: INTEGER"),
+            (
+                r#"{"name": "Monkey"}[fn(x) { x }];"#,
+                "unusable as HashKey: FUNCTION",
+            ),
         ];
         for test in tests {
             let evaluated = test_eval(test.0);
@@ -711,6 +760,68 @@ mod test {
             ),
             ("[1, 2, 3][3]", Box::new(NULL)),
             ("[1, 2, 3][-1]", Box::new(NULL)),
+        ];
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            match test.1.downcast_ref::<i64>() {
+                Some(expected) => test_integer_object(evaluated, *expected),
+                None => test_null_object(evaluated),
+            }
+        }
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let input = r#"let two = "two";
+        {
+            "one": 10 - 9,
+            "two": 1 + 1,
+            "thr" + "ee": 6 / 2,
+            4: 4,
+            true: 5,
+            false: 6,
+        }"#;
+        let evaluated = test_eval(input);
+
+        match evaluated {
+            Object::HashObj(hash) => {
+                let expected = vec![
+                    (Object::StringObj(String::from("one")).hash_key(), 1),
+                    (Object::StringObj(String::from("two")).hash_key(), 2),
+                    (Object::StringObj(String::from("three")).hash_key(), 3),
+                    (Object::Integer(4).hash_key(), 4),
+                    (TRUE.hash_key(), 5),
+                    (FALSE.hash_key(), 6),
+                ];
+                assert_eq!(
+                    hash.pairs.len(),
+                    expected.len(),
+                    "hash object has wrong number of pairs. Expected = {}, got = {}",
+                    expected.len(),
+                    hash.pairs.len()
+                );
+                for (expected_key, expected_value) in expected {
+                    let pair = match hash.pairs.get(expected_key.as_ref().unwrap()) {
+                        Some(res) => res,
+                        None => panic!("no pair for given key in pairs"),
+                    };
+                    test_integer_object(pair.value.clone(), expected_value);
+                }
+            }
+            other => panic!("eval did not return HashObj. Got = {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_hash_index_expressions() {
+        let tests: Vec<(&str, Box<dyn any::Any>)> = vec![
+            (r#"{"foo": 5}["foo"]"#, Box::new(5_i64)),
+            (r#"{"foo": 5}["bar"]"#, Box::new(NULL)),
+            (r#"let key = "foo"; {"foo": 5}[key]"#, Box::new(5_i64)),
+            (r#"{}["foo"]"#, Box::new(NULL)),
+            (r#"{5: 5}[5]"#, Box::new(5_i64)),
+            (r#"{true: 5}[true]"#, Box::new(5_i64)),
+            (r#"{false: 5}[false]"#, Box::new(5_i64)),
         ];
         for test in tests {
             let evaluated = test_eval(test.0);
