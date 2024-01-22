@@ -10,6 +10,7 @@ impl Builtins {
             (String::from("last"), Object::Builtin(b_last)),
             (String::from("rest"), Object::Builtin(b_rest)),
             (String::from("push"), Object::Builtin(b_push)),
+            (String::from("puts"), Object::Builtin(b_puts)),
         ]
     }
 }
@@ -117,4 +118,11 @@ fn b_push(args: Vec<Object>) -> Object {
             other.object_type()
         )),
     }
+}
+
+fn b_puts(args: Vec<Object>) -> Object {
+    for arg in args {
+        println!("{}", arg);
+    }
+    NULL
 }
